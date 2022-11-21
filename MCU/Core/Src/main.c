@@ -111,7 +111,7 @@ const uint8_t cc1200_tx_settings[50*3] =
 	0x00, 0x01, 0x08,
 	0x00, 0x03, 0x09,
 	0x00, 0x08, 0x1F,
-	0x00, 0x0A, 0x06, //deviation
+	0x00, 0x0A, 0x59, //deviation
 	0x00, 0x0B, 0x01, //deviation, LSB - exponent
 	0x00, 0x0C, 0x5D,
 	0x00, 0x0D, 0x00,
@@ -160,7 +160,7 @@ const uint8_t cc1200_tx_settings[50*3] =
 	0x2F, 0x91, 0x08,
 };
 
-uint8_t tx_data[4];
+uint8_t tx_data[8];
 uint8_t rx_data[3]={0,0,0};
 
 volatile uint8_t irq_pend=0;
@@ -307,6 +307,33 @@ void CC1200_TXRXEnd(void)
 {
 	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, 1);
 }
+
+//set frequency - burst mode
+void CC1200_SetFreq(uint32_t freq)
+{
+	uint32_t val=(float)freq/5000000*(1<<16);
+
+	tx_data[0]=0x2F|0x40;
+	tx_data[1]=0x0C;
+	tx_data[2]=(val>>16)&0xFF;
+	tx_data[3]=(val>>8)&0xFF;
+	tx_data[4]=val&0xFF;
+
+	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, 0);
+	HAL_SPI_Transmit(&hspi1, tx_data, 5, 10);
+	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, 1);
+}
+
+//set power (0x01..0x3F)
+void CC1200_SetPwr(uint8_t pwr)
+{
+	tx_data[0]=0x2B;
+	tx_data[1]=pwr;
+
+	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, 0);
+	HAL_SPI_Transmit(&hspi1, tx_data, 2, 10);
+	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, 1);
+}
 /* USER CODE END 0 */
 
 /**
@@ -351,23 +378,29 @@ int main(void)
   HAL_Delay(100);
 
   //chip config
-  //CC1200_Init(cc1200_tx_settings);
-  CC1200_Init(cc1200_rx_settings);
+  CC1200_Init(cc1200_tx_settings);
+  //CC1200_Init(cc1200_rx_settings);
+
+  //frequency - override the setting in the init sequence
+  CC1200_SetFreq(439000000);
+
+  //power - override the setting in the init sequence
+  CC1200_SetPwr(0x3C);
 
   //freq offset compensation
-  CC1200_Offset(307);
+  CC1200_Offset(303);
   HAL_Delay(10);
 
   //mode - TX/RX
-  //CC1200_TXMode();
-  CC1200_RXMode();
+  CC1200_TXMode();
+  //CC1200_RXMode();
 
   //dont increment address in burst mode
   CC1200_BurstModeIncr(0);
 
   //start write/read burst - tx/rx reg
-  //CC1200_TXStart();
-  CC1200_RXStart();
+  CC1200_TXStart();
+  //CC1200_RXStart();
 
   HAL_TIM_Base_Start_IT(&htim6);
   /* USER CODE END 2 */
@@ -377,7 +410,7 @@ int main(void)
   while (1)
   {
 	  //TX
-	  /*if(irq_pend)
+	  if(irq_pend)
 	  {
 		  //do the filtering here
 		  for(uint8_t i=0; i<41-1; i++)
@@ -417,23 +450,23 @@ int main(void)
 		  for(uint8_t i=0; i<41; i++)
 			  mac+=buff[i]*taps2[i];
 
-		  sample=mac*49;
+		  sample=mac*40.0;
 
 		  HAL_SPI_Transmit(&hspi1, (uint8_t*)&sample, 1, 5);
 		  //HAL_UART_Transmit_IT(&huart1, (uint8_t*)&sample, 1);
 
 		  irq_pend=0;
-	  }*/
+	  }
 
 	  //RX
-	  if(irq_pend)
+	  /*if(irq_pend)
 	  {
 		  HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, 1, 10);
 		  uint16_t s=((int8_t)rx_data[0]+128);
 		  HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, s);
 		  HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
 		  irq_pend=0;
-	  }
+	  }*/
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
