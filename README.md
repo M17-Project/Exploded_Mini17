@@ -1,5 +1,4 @@
 # Exploded_Mini17
-**See the warning at the bottom of this readme!**
 
 This is an exploded version of the [Mini17](https://github.com/M17-Project/Mini17) UHF handheld tranceiver, a [TR-9](https://github.com/M17-Project/TR-9) successor. Its purpose is to allow for experimentation with the [CC1200](https://www.ti.com/product/CC1200) chip and its M17 use. In other words, it's an STM32+CC1200 evaluation board.
 
@@ -44,8 +43,3 @@ The Exploded Mini17 has all the peripherals a walkie-talkie development board sh
 |`TP4`|Speaker amplifier input signal||
 |`TP5`|Microphone signal|DC-biased|
 |`TP6`|Amplified microphone signal|DC-biased|
-
-## Warning!
-There's an error in the PCB, at the bottom layer, just below the `U3` CC1200 chip. `VCC` is shorted with `GND`. Some copper carving is needed to isolate this and make the board work (see image below). Alternatively, 7 vias marked below can be **shallowly** drilled with a ≤0.5mm drill, just to break the connection between the via and the bottom layer. This is a lot easier, precise and faster.
-
-<img src="https://raw.githubusercontent.com/M17-Project/Exploded_Mini17/main/carve.png" width=300>
