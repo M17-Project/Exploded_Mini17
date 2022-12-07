@@ -57,7 +57,7 @@ const uint8_t cc1200_rx_settings[50*3] =
 	0x00, 0x01, 0x08,
 	0x00, 0x03, 0x09,
 	0x00, 0x08, 0x1F,
-	0x00, 0x0A, 0x9F, //RX bw
+    0x00, 0x0A, 0x9F, //RX bw
 	0x00, 0x0B, 0x00,
 	0x00, 0x0C, 0x5D,
 	0x00, 0x0D, 0x00,
@@ -66,9 +66,9 @@ const uint8_t cc1200_rx_settings[50*3] =
 	0x00, 0x10, 0xAC,
 	0x00, 0x11, 0x00,
 	0x00, 0x12, 0x45,
-	0x00, 0x13, 0x3F, //symbol rate 2
-	0x00, 0x14, 0x75, //symbol rate 1
-	0x00, 0x15, 0x10, //symbol rate 0
+	0x00, 0x13, 0x83, //symbol rate 2 - 24kSa/s
+	0x00, 0x14, 0xA9, //symbol rate 1
+	0x00, 0x15, 0x2A, //symbol rate 0
 	0x00, 0x16, 0x37,
 	0x00, 0x17, 0xEC,
 	0x00, 0x19, 0x11,
@@ -84,7 +84,7 @@ const uint8_t cc1200_rx_settings[50*3] =
 	0x2F, 0x00, 0x1C,
 	0x2F, 0x01, 0x02, //AFC, 0x22 - on, 0x02 - off
 	0x2F, 0x05, 0x0D,
-	0x2F, 0x0C, 0x57, //freq round((float)435000000/5000000*(1<<16))
+	0x2F, 0x0C, 0x57, //freq 435MHz, round((float)435000000/5000000*(1<<16))
 	0x2F, 0x0D, 0x00, //freq
 	0x2F, 0x0E, 0x00, //freq
 	0x2F, 0x10, 0xEE,
@@ -163,7 +163,8 @@ const uint8_t cc1200_tx_settings[50*3] =
 uint8_t tx_data[8];
 uint8_t rx_data[3]={0,0,0};
 
-volatile uint8_t irq_pend=0;
+volatile uint8_t irq_pend=0;	//baseband sample IRQ
+volatile uint8_t mode=0;		//0 - RX, 1- TX
 
 float buff[81];			//look-back buffer for the FIR
 uint8_t pushed=0;		//how many samples have we pushed to the buffer
@@ -191,8 +192,6 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN 0 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	//HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, 1, 10);
-	//HAL_UART_Transmit_IT(&huart1, rx_data, 1);
 	//HAL_GPIO_TogglePin(TST_PIN_GPIO_Port, TST_PIN_Pin);
 	irq_pend=1;
 }
@@ -202,7 +201,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	//BTN1
 	if(GPIO_Pin==GPIO_PIN_0)
 	{
-		;//
+		HAL_GPIO_TogglePin(MIC_MUTE_GPIO_Port, MIC_MUTE_Pin);
 	}
 
 	//BTN2
@@ -377,12 +376,15 @@ int main(void)
   CC1200_Reset();
   HAL_Delay(100);
 
+  //TX/RX mode, 0 - RX, 1- TX
+  mode=0;
+
   //chip config
-  CC1200_Init(cc1200_tx_settings);
-  //CC1200_Init(cc1200_rx_settings);
+  //CC1200_Init(cc1200_tx_settings);
+  CC1200_Init(cc1200_rx_settings);
 
   //frequency - override the setting in the init sequence
-  CC1200_SetFreq(439000000);
+  CC1200_SetFreq(439950000);
 
   //power - override the setting in the init sequence
   CC1200_SetPwr(0x3C);
@@ -392,15 +394,15 @@ int main(void)
   HAL_Delay(10);
 
   //mode - TX/RX
-  CC1200_TXMode();
-  //CC1200_RXMode();
+  //CC1200_TXMode();
+  CC1200_RXMode();
 
   //dont increment address in burst mode
   CC1200_BurstModeIncr(0);
 
   //start write/read burst - tx/rx reg
-  CC1200_TXStart();
-  //CC1200_RXStart();
+  //CC1200_TXStart();
+  CC1200_RXStart();
 
   HAL_TIM_Base_Start_IT(&htim6);
   /* USER CODE END 2 */
@@ -409,64 +411,65 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  //TX
+
 	  if(irq_pend)
 	  {
-		  //do the filtering here
-		  for(uint8_t i=0; i<41-1; i++)
-			  buff[i]=buff[i+1];
-		  pushed++;
-		  pushed%=5;
-		  if(pushed==0)
+		  if(mode)//TX
 		  {
-			  uint8_t s=(m17_stream[byte]>>dibit)&3;
+			  //do the filtering here
+			  for(uint8_t i=0; i<41-1; i++)
+				  buff[i]=buff[i+1];
+			  pushed++;
+			  pushed%=5;
+			  if(pushed==0)
+			  {
+				  uint8_t s=(m17_stream[byte]>>dibit)&3;
 
-			  if(s == 0b00)
-				  buff[40]=1.0;
-			  else if(s == 0b01)
-				  buff[40]=3.0;
-			  else if(s == 0b10)
-				  buff[40]=-1.0;
-			  else
-				  buff[40]=-3.0;
+				  if(s == 0b00)
+					  buff[40]=1.0;
+				  else if(s == 0b01)
+					  buff[40]=3.0;
+				  else if(s == 0b10)
+					  buff[40]=-1.0;
+				  else
+					  buff[40]=-3.0;
 
-			  if(dibit>0)
-				  dibit-=2;
+				  if(dibit>0)
+					  dibit-=2;
+				  else
+				  {
+					  dibit=6;
+					  byte++;
+				  }
+
+				  if(byte==STREAM_SIZE)
+					  byte=0;
+			  }
 			  else
 			  {
-				  dibit=6;
-				  byte++;
+				  buff[40]=0.0;
 			  }
 
-			  if(byte==STREAM_SIZE)
-				  byte=0;
+			  mac=0.0;
+			  for(uint8_t i=0; i<41; i++)
+				  mac+=buff[i]*taps2[i];
+
+			  sample=mac*40.0;
+
+			  HAL_SPI_Transmit(&hspi1, (uint8_t*)&sample, 1, 5);
+			  //HAL_UART_Transmit_IT(&huart1, (uint8_t*)&sample, 1);
 		  }
-		  else
+		  else //RX
 		  {
-			  buff[40]=0.0;
+			  HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, 1, 10);
+			  //uint16_t s=((int8_t)rx_data[0]+128);
+			  //HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, s);
+			  //HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+		  	  HAL_UART_Transmit_IT(&huart1, rx_data, 1);
 		  }
-
-		  mac=0.0;
-		  for(uint8_t i=0; i<41; i++)
-			  mac+=buff[i]*taps2[i];
-
-		  sample=mac*40.0;
-
-		  HAL_SPI_Transmit(&hspi1, (uint8_t*)&sample, 1, 5);
-		  //HAL_UART_Transmit_IT(&huart1, (uint8_t*)&sample, 1);
 
 		  irq_pend=0;
 	  }
-
-	  //RX
-	  /*if(irq_pend)
-	  {
-		  HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, 1, 10);
-		  uint16_t s=((int8_t)rx_data[0]+128);
-		  HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, s);
-		  HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
-		  irq_pend=0;
-	  }*/
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
