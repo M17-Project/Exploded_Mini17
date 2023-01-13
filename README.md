@@ -7,6 +7,13 @@ This is an exploded version of the [Mini17](https://github.com/M17-Project/Mini1
 ## Flashing
 To enter the DFU mode, keep BTN2 pressed while powering the board up.
 
+### Flashing under Windows with dfu-util
+```
+cd C:\path\to\the\binary\file
+dfu-util -d 28e9:0189 -a 0 -D Exploded_Mini17.bin -s 0x8000000
+```
+Change the binary file's name if needed.
+
 ## Hardware
 The Exploded Mini17 has all the peripherals a walkie-talkie development board should have:
 * GD32/STM32F405RGT6 micro with most of the unused pins available at the 2.54mm pin headers,
