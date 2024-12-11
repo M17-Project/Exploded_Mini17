@@ -5,7 +5,7 @@ This is an exploded version of the [Mini17](https://github.com/M17-Project/Mini1
 <img src="https://raw.githubusercontent.com/M17-Project/Exploded_Mini17/main/render.png" width="500">
 
 ## Flashing
-To enter the DFU mode, keep BTN2 pressed while powering the board up.
+A sample firmware (CubeIDE project) is available through a [separate repository](https://github.com/M17-Project/Exploded_Mini17-fw-test). To enter the DFU mode, keep BTN2 pressed while powering the board up.
 
 ### Flashing under Windows with dfu-util
 ```
